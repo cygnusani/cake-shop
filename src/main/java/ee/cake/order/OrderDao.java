@@ -3,54 +3,44 @@ package ee.cake.order;
 import ee.cake.cake.Cake;
 import ee.cake.cake.CakeDao;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.ResultSetExtractor;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.persistence.EntityManager;
+import javax.persistence.TypedQuery;
 import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
-import static ee.cake.order.Order.StatusCode.SUBMITTED;
-
-@Component
+@Repository
 @Transactional
 public class OrderDao {
 
     @Autowired
-    private JdbcTemplate database;
+    private EntityManager em;
 
     @Autowired
     private CakeDao cakeDao;
 
     public void insert(NewOrderJson json) {
         Long orderId = insertOrder(json.getCustomerName(), findTotalOrderPrice(json));
-
         insertOrderCake(orderId, json.getCakeId(), json.getAmount());
     }
 
     public List<Order> findAllOrders() {
-        return database.query("SELECT * FROM ORDER;", new OrderMapper());
+        TypedQuery<Order> query = em.createQuery("select o from Order o", Order.class);
+        return query.getResultList();
     }
 
     public void updateStatus(Long orderId, Order.StatusCode statusCode) {
-        List<Object> args = new ArrayList<>();
-        args.add(statusCode.toString());
-        args.add(orderId);
-
-        database.update("UPDATE ORDER SET STATUS_CODE = ? WHERE ID = ?;", args.toArray());
+        TypedQuery<Order> query = em.createQuery("select o from Order o where o.id = :id", Order.class);
+        Order temp = query.setParameter("id", orderId).getSingleResult();
+        temp.setStatusCode(statusCode.toString());
+        em.merge(temp);
     }
 
     private List<OrderCake> findOrderedCakesByOrder(Long orderId) {
-        List<Object> args = new ArrayList<>();
-        args.add(orderId);
-
-        return database.query("SELECT * FROM ORDER_CAKE WHERE ORDER_ID = ?;", args.toArray(), new OrderCakeMapper());
+        TypedQuery<OrderCake> query = em.createQuery("select oc from OrderCake oc where oc.orderId = :id", OrderCake.class);
+        return query.setParameter("id", orderId).getResultList();
 
     }
 
@@ -59,47 +49,16 @@ public class OrderDao {
         return cake.getPrice().multiply(BigDecimal.valueOf(json.getAmount().longValue()));
     }
 
-    private void insertOrderCake(Long orderId, Long cakeId, Integer amount) {
-        List<Object> args = new ArrayList<>();
-        args.add(orderId);
-        args.add(cakeId);
-        args.add(amount);
-
-        database.update("INSERT INTO ORDER_CAKE (order_id, cake_id, amount) VALUES (?,?,?);", args.toArray());
+    void insertOrderCake(Long orderId, Long cakeId, Integer amount) {
+        em.persist(new OrderCake(orderId, cakeId, amount));
     }
 
-    private Long insertOrder(String customerName, BigDecimal amount) {
-        List<Object> args = new ArrayList<>();
-        args.add(customerName);
-        args.add(amount);
-        args.add(SUBMITTED.toString());
-
-        database.update("INSERT INTO ORDER (customer_name, price, status_code) VALUES (?,?,?);", args.toArray());
-
-        return database.queryForObject("CALL IDENTITY()", Long.class); //return last generated identity
+    // https://stackoverflow.com/questions/9732453/jpa-returning-an-auto-generated-id-after-persist/9734002
+    Long insertOrder(String customerName, BigDecimal amount) {
+        Order order = new Order(customerName, amount, "SUBMITTED");
+        em.persist(order);
+        em.flush();
+        return order.getId();
     }
 
-    private final class OrderMapper implements RowMapper<Order> {
-        @Override
-        public Order mapRow(ResultSet rs, int rowNum) throws SQLException {
-            Order order = new Order();
-            order.setId(rs.getLong("id"));
-            order.setCustomerName(rs.getString("customer_name"));
-            order.setPrice(rs.getBigDecimal("price"));
-            order.setStatusCode(Order.StatusCode.valueOf(rs.getString("status_code")));
-            order.setOrderedCakes(findOrderedCakesByOrder(order.getId()));
-            return order;
-        }
-    }
-
-    private final class OrderCakeMapper implements RowMapper<OrderCake> {
-        @Override
-        public OrderCake mapRow(ResultSet rs, int rowNum) throws SQLException {
-            OrderCake orderCake = new OrderCake();
-            orderCake.setId(rs.getLong("id"));
-            orderCake.setAmount(rs.getInt("amount"));
-            orderCake.setCake(cakeDao.findById(rs.getLong("cake_id")));
-            return orderCake;
-        }
-    }
 }

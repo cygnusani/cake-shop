@@ -1,56 +1,42 @@
 package ee.cake.order;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import javax.persistence.*;
 import java.math.BigDecimal;
 import java.util.List;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
 public class Order {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private Long id;
+    @Column(name = "customer_name")
     private String customerName;
     private BigDecimal price;
-    private StatusCode statusCode;
+    @Column(name = "status_code")
+    private String statusCode;
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @JoinColumn(name = "order_id")
     private List<OrderCake> orderedCakes;
 
-    public enum StatusCode {
-        SUBMITTED, READY, DELIVERED, CANCELLED
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getCustomerName() {
-        return customerName;
-    }
-
-    public void setCustomerName(String customerName) {
+    public Order(String customerName, BigDecimal amount, String statusCode) {
         this.customerName = customerName;
-    }
-
-    public BigDecimal getPrice() {
-        return price;
-    }
-
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
-
-    public StatusCode getStatusCode() {
-        return statusCode;
-    }
-
-    public void setStatusCode(StatusCode statusCode) {
+        this.price = amount;
         this.statusCode = statusCode;
     }
 
-    public List<OrderCake> getOrderedCakes() {
-        return orderedCakes;
+    public Order(Long orderId, String statusCode) {
+        this.id = orderId;
+        this.statusCode = statusCode;
     }
 
-    public void setOrderedCakes(List<OrderCake> orderedCakes) {
-        this.orderedCakes = orderedCakes;
+    public enum StatusCode {
+        SUBMITTED, READY, DELIVERED, CANCELLED
     }
 }

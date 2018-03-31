@@ -35,6 +35,16 @@ public class OrderController {
 
     @GetMapping("all")
     public List<Order> findAllOrders() {
+        List<Order> temp = orderDao.findAllOrders();
+        for (Order v: temp
+             ) {
+            System.out.println("Order id: " + v.getId() + " cakes:");
+            for (OrderCake oc: v.getOrderedCakes()
+                 ) {
+                System.out.println(oc.getCake().getName());
+            }
+            System.out.println("END");
+        }
         return orderDao.findAllOrders();
     }
 }

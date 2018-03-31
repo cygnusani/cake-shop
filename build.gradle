@@ -1,5 +1,5 @@
 group "ee.cake"
-version "0.0.1"
+version "0.0.2"
 
 apply plugin: "java"
 apply plugin: "org.springframework.boot"
@@ -20,6 +20,10 @@ dependencies {
     compile "org.hsqldb:hsqldb"
 
     testCompile "junit:junit:4.11"
+
+    compileOnly group: 'org.projectlombok',
+            name: 'lombok',
+            version: '1.16.20'
 }
 
 task wrapper(type: Wrapper) {
